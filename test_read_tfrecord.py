@@ -35,9 +35,9 @@ class TestReadTFRecord(unittest.TestCase):
         with tf.Session() as sess:
             coord = tf.train.Coordinator()
             threads = tf.train.start_queue_runners(sess=sess, coord=coord)
-            
+
             img_b, rating_b = sess.run([img_batch, rating_batch])
-            
+
             print(rating_b)
             print(len(img_b))
 
@@ -45,6 +45,20 @@ class TestReadTFRecord(unittest.TestCase):
 
             cv2.imshow("haha", img_x)
             cv2.waitKey()
+
+    def test_batch_dataset(self):
+        """
+        测试使用dataset得到batch功能是否正常
+        """
+
+        batch_dataset_next = utils.get_batch_dataset_iterator("data/train.tfrecord", batch_size=32)
+
+        with tf.Session() as sess:
+            img_batch = sess.run(batch_dataset_next["img"])
+            img = img_batch[2]
+            cv2.imshow("hehe", img)
+            cv2.waitKey()
+
         
 
 if __name__ == '__main__':
