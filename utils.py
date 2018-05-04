@@ -1,9 +1,12 @@
 import os
 import sys
 
+import re
+
 import tensorflow as tf
 
-def read_record(filepath):
+
+def read_record(filepattern):
     """
     读取tfrecord的内容
 
@@ -13,7 +16,17 @@ def read_record(filepath):
 
     reader = tf.TFRecordReader()
 
-    filename_queue = tf.train.string_input_producer([filepath])
+    filenames = tf.train.match_filenames_once(filepattern)
+
+    # 测试tf.train.match_filenames_once是否功能正常的代码
+    #  init = (tf.global_variables_initializer(), tf.local_variables_initializer())
+    #  print(tfrecord_path)
+    #  with tf.Session() as sess:
+        #  sess.run(init)
+        #  print(sess.run(filenames))
+    #  sys.exit(0)
+
+    filename_queue = tf.train.string_input_producer(filenames)
 
     _, serialized_record = reader.read(filename_queue)
 
@@ -32,7 +45,7 @@ def read_record(filepath):
 
     return img, rating
 
-def get_batch(filepath, batch_size):
+def get_batch(filepattern, batch_size):
     """
     从给定文件中读取一个batch的数据
 
@@ -40,7 +53,7 @@ def get_batch(filepath, batch_size):
     @param batch_size: 批数据的大小
     @return: 一个批次的数据
     """
-    img, rating = read_record(filepath)
+    img, rating = read_record(filepattern)
     # min_after_dequeue代表当队列中的数据数目小于min_after_dequeue的值时，不再进行shuffle
     min_after_dequeue = 10000
     # capacity队列的容量，它的值必须大于min_after_dequeue的值
@@ -49,7 +62,32 @@ def get_batch(filepath, batch_size):
     img_batch, rating_batch = tf.train.shuffle_batch([img, rating], batch_size=batch_size, capacity=capacity, min_after_dequeue=min_after_dequeue)
     return img_batch, rating_batch
 
-def get_batch_dataset_iterator(filepath, batch_size):
+def get_filenames_by_regexp(filepattern):
+    """
+    根据给定的模式查找到所有的文件名
+
+    @param filepattern: 文件名模式
+    @return: 一个列表，里面包含了满足此模式的所有文件名
+    """
+
+    filepattern = filepattern.replace("*", ".*")
+
+    dir_path = filepattern.split("/")[:-1]
+    dir_path = "/".join(dir_path)
+    
+    file_list = os.listdir(dir_path)
+
+    file_list = map(lambda filename: os.path.join(dir_path, filename), file_list)
+
+    def filter_pattern(filename):
+        return re.match(filepattern, filename)
+    
+    file_list_filter = [filename for filename in file_list if filter_pattern(filename)]
+    return file_list_filter
+
+
+
+def get_batch_dataset_iterator(filepattern, batch_size):
     """
     通过tf.data.DataSet的方式读取一个batch
 
@@ -58,7 +96,12 @@ def get_batch_dataset_iterator(filepath, batch_size):
     @return: 一个批次的数据
     """
 
-    dataset = tf.data.TFRecordDataset([filepath])
+
+    filenames = get_filenames_by_regexp(filepattern)
+
+    #  filenames = shuffle(filenames)
+
+    dataset = tf.data.TFRecordDataset(filenames)
 
     def parse_func(example_proto):
         """
